@@ -14,6 +14,7 @@ from typing import Annotated
 import typer
 
 from . import __version__
+from .collect import build_context, print_summary, run_collection
 from .console import console, err_console
 
 app = typer.Typer(
@@ -82,7 +83,28 @@ def collect(
     ] = None,
 ) -> None:
     """Collect forensic artifacts into a case folder (order of volatility respected)."""
-    _todo("collect")
+    is_live = root == Path("/")
+    if is_live and not authorized:
+        err_console.print(
+            "[err]Refusing to collect from a LIVE host without authorization.[/err]\n"
+            "[muted]Collecting from a running system requires the explicit "
+            "[bold]--i-have-authorization[/bold] flag, asserting you are authorized "
+            "to examine this host. Use [bold]--root <mountpoint>[/bold] for a dead image.[/muted]"
+        )
+        raise typer.Exit(code=2)
+    if not is_live and not root.exists():
+        err_console.print(f"[err]--root path does not exist:[/err] {root}")
+        raise typer.Exit(code=2)
+
+    ctx = build_context(root, authorized=authorized)
+    err_console.print(
+        f"[accent]⚖  Ammit[/accent] collecting from [bold]{ctx.target_host}[/bold] "
+        f"([info]{ctx.mode}[/info], root={ctx.root})"
+    )
+    case = run_collection(ctx, output, label=label)
+    print_summary(case)
+    # The case path goes to stdout so it can be captured by a pipeline.
+    console.print(str(case.path))
 
 
 # --- Stage 2: order the memories ----------------------------------------------

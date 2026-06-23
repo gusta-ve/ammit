@@ -69,3 +69,14 @@ class ScanContext:
         if p.is_absolute():
             return self.root / p.relative_to("/")
         return self.root / p
+
+    def to_target(self, real_path: str | Path) -> str:
+        """Inverse of :meth:`resolve`: map a real on-disk path back to the path
+        it represents *on the target* (e.g. ``<root>/etc/passwd`` -> ``/etc/passwd``).
+        """
+        real = Path(real_path)
+        try:
+            rel = real.relative_to(self.root).as_posix()
+        except ValueError:
+            return str(real)
+        return "/" if rel == "." else "/" + rel
