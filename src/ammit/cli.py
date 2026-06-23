@@ -1,0 +1,186 @@
+"""The ``ammit`` command-line interface.
+
+Subcommands map to the stages of the weighing ceremony: ``collect`` gathers the
+heart, ``timeline`` orders its memories, ``triage`` weighs it against the
+feather, and ``report``/``verdict`` pronounce judgement. ``baseline`` records a
+known-good heart for future comparison.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+from . import __version__
+from .console import console, err_console
+
+app = typer.Typer(
+    name="ammit",
+    help=(
+        "Ammit — DFIR triage for Linux. The Devourer of the Dead weighs a "
+        "system's heart (its artifacts) against the feather of Maat (baselines "
+        "and IOC rules) and renders a verdict."
+    ),
+    no_args_is_help=True,
+    add_completion=False,
+    rich_markup_mode="rich",
+)
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        console.print(f"ammit {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            help="Show version and exit.",
+            is_eager=True,
+            callback=_version_callback,
+        ),
+    ] = False,
+) -> None:
+    """Weigh the heart of a Linux system against the feather of Maat."""
+
+
+def _todo(name: str) -> None:
+    err_console.print(
+        f"[warn]⚖  '{name}' is not implemented yet — landing in an upcoming commit.[/warn]"
+    )
+    raise typer.Exit(code=1)
+
+
+# --- Stage 1: gather the heart -------------------------------------------------
+@app.command()
+def collect(
+    root: Annotated[
+        Path,
+        typer.Option(help="Target filesystem root. '/' = live host; a mountpoint = image mode."),
+    ] = Path("/"),
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Directory that will hold the case folder."),
+    ] = Path("cases"),
+    authorized: Annotated[
+        bool,
+        typer.Option(
+            "--i-have-authorization",
+            help="REQUIRED to collect from a LIVE host. Asserts you are authorized to do so.",
+        ),
+    ] = False,
+    label: Annotated[
+        str | None,
+        typer.Option(help="Optional human-readable label recorded in the case manifest."),
+    ] = None,
+) -> None:
+    """Collect forensic artifacts into a case folder (order of volatility respected)."""
+    _todo("collect")
+
+
+# --- Stage 2: order the memories ----------------------------------------------
+@app.command()
+def timeline(
+    case: Annotated[
+        Path, typer.Argument(help="Path to a case folder produced by `ammit collect`.")
+    ],
+    fmt: Annotated[
+        str,
+        typer.Option(
+            "--format", "-f", help="Output format: csv | json | body (mactime body file)."
+        ),
+    ] = "csv",
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output", "-o", help="Where to write the timeline (defaults inside the case)."
+        ),
+    ] = None,
+) -> None:
+    """Build an ordered super-timeline (MAC times + log events)."""
+    _todo("timeline")
+
+
+# --- Stage 3: weigh against the feather ---------------------------------------
+@app.command()
+def triage(
+    case: Annotated[
+        Path, typer.Argument(help="Path to a case folder produced by `ammit collect`.")
+    ],
+    rules: Annotated[
+        Path | None,
+        typer.Option(help="Additional rules file or directory (YAML)."),
+    ] = None,
+    baseline: Annotated[
+        Path | None,
+        typer.Option(help="Known-good baseline to compare against."),
+    ] = None,
+    fmt: Annotated[
+        str,
+        typer.Option("--format", "-f", help="Output format: table | json."),
+    ] = "table",
+) -> None:
+    """Run the rule engine over collected artifacts and emit weighed findings."""
+    _todo("triage")
+
+
+# --- Stage 4: pronounce judgement ---------------------------------------------
+@app.command()
+def report(
+    case: Annotated[Path, typer.Argument(help="Path to a triaged case folder.")],
+    fmt: Annotated[
+        str,
+        typer.Option("--format", "-f", help="Report format: md | json | html | all."),
+    ] = "md",
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output", "-o", help="Where to write the report (defaults inside the case)."
+        ),
+    ] = None,
+) -> None:
+    """Render the full 'weighing of the heart' report (Markdown / JSON / HTML)."""
+    _todo("report")
+
+
+@app.command()
+def verdict(
+    case: Annotated[Path, typer.Argument(help="Path to a triaged case folder.")],
+) -> None:
+    """Print only the verdict: CLEAN / SUSPICIOUS / COMPROMISED."""
+    _todo("verdict")
+
+
+# --- The feather: record a known-good heart -----------------------------------
+@app.command()
+def baseline(
+    root: Annotated[
+        Path,
+        typer.Option(help="Target filesystem root to snapshot. '/' = live host."),
+    ] = Path("/"),
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Path to write the baseline snapshot (JSON)."),
+    ] = Path("baseline.json"),
+    authorized: Annotated[
+        bool,
+        typer.Option(
+            "--i-have-authorization",
+            help="REQUIRED to snapshot a LIVE host. Asserts you are authorized to do so.",
+        ),
+    ] = False,
+) -> None:
+    """Snapshot a known-good state (binary hashes, ports, cron, users) for later comparison."""
+    _todo("baseline")
+
+
+def run() -> None:
+    """Console-script entry point (see ``[project.scripts]`` in pyproject)."""
+    app()

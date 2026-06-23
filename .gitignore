@@ -1,0 +1,36 @@
+# --- Ammit: never commit collected evidence or real case data ---
+case/
+cases/
+*.ammit-case/
+*.case
+manifest.json.bak
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.installed.cfg
+*.egg
+
+# --- Virtualenvs ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Tooling ---
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
