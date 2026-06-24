@@ -1,0 +1,155 @@
+# Ammit built-in triage rules — the feather of Maat.
+#
+# Each rule selects a dataset (see ammit.rules.datasets), filters it with ANDed
+# `where` conditions, and emits a finding. `group_by` + `having` express
+# aggregate rules ("N or more of the same thing"). MITRE ATT&CK technique IDs
+# accompany every rule. These are leads for an analyst, not proof.
+
+- id: deleted_binary_process
+  title: Process running a binary deleted from disk
+  severity: critical
+  dataset: deleted_binaries
+  description: >
+    A process is executing an image that was unlinked from the filesystem while
+    it kept running — a classic way to hide malware from on-disk scanning.
+  evidence: "PID {pid} ({name}) runs deleted binary {exe} — cmdline: {cmdline}"
+  mitre: [T1070.004, T1036.005]
+
+- id: duplicate_uid0
+  title: Multiple accounts share UID 0
+  severity: critical
+  dataset: uid0_accounts
+  description: >
+    Only root should own UID 0. A second UID-0 account is a textbook backdoor
+    granting silent superuser access.
+  group_by: [uid]
+  having: { op: ge, count: 2 }
+  evidence: "{count} accounts share UID 0 — any non-root entry is a backdoor"
+  evidence_each: "  {name}  (gid={gid}, home={home}, shell={shell})"
+  mitre: [T1136.001, T1078.003]
+
+- id: ssh_bruteforce
+  title: SSH brute-force from a single source
+  severity: high
+  dataset: auth_events
+  description: >
+    A burst of failed SSH password attempts from one IP indicates brute-force or
+    password-spray activity. Pair with any subsequent Accepted line from the
+    same host.
+  where:
+    - { field: event, op: eq, value: failed_password }
+  group_by: [source_ip]
+  having: { op: ge, count: 8 }
+  evidence: "{count} failed SSH logins from {source_ip} (last user tried: {user})"
+  mitre: [T1110.001]
+
+- id: ld_preload_rootkit
+  title: /etc/ld.so.preload present
+  severity: high
+  dataset: init_hooks
+  description: >
+    /etc/ld.so.preload forces a library into every dynamically linked process —
+    the dominant userland-rootkit persistence vector. Its mere presence is
+    abnormal on most systems and warrants inspection of the named object.
+  where:
+    - { field: source, op: eq, value: /etc/ld.so.preload }
+  evidence: "/etc/ld.so.preload exists (size={size}, mode={mode}, mtime={mtime})"
+  mitre: [T1574.006]
+
+- id: suspicious_suid
+  title: SUID binary outside system directories
+  severity: high
+  dataset: suid_sgid
+  description: >
+    SUID executables in writable or user-controlled locations (/tmp, /dev/shm,
+    home directories) are a common privilege-escalation foothold.
+  where:
+    - { field: suid, op: truthy }
+    - { field: standard_location, op: falsy }
+  evidence: "SUID binary off the beaten path: {path} ({mode}, uid={uid}, {size} bytes)"
+  mitre: [T1548.001]
+
+- id: suspicious_cron
+  title: Cron job with a suspicious command
+  severity: high
+  dataset: cron_entries
+  description: >
+    A scheduled command that downloads-and-executes, opens a reverse shell or
+    stages payloads from world-writable directories — persistence via cron.
+  where:
+    - { field: indicator, op: truthy }
+  evidence: "{source}: {command}  [matched: {indicator}]"
+  mitre: [T1053.003]
+
+- id: suspicious_systemd
+  title: systemd unit with a suspicious ExecStart
+  severity: high
+  dataset: systemd_admin
+  description: >
+    An administrator-defined systemd unit whose ExecStart resembles a reverse
+    shell or download-and-execute payload — persistence as a managed service.
+  where:
+    - { field: indicator, op: truthy }
+  evidence: "{unit}: ExecStart={exec_start}  [matched: {indicator}]"
+  mitre: [T1543.002]
+
+- id: ssh_key_for_system_account
+  title: authorized_keys on a non-login account
+  severity: high
+  dataset: authorized_keys
+  description: >
+    A system/service account whose shell is nologin or false should never carry
+    an SSH authorized_keys entry — a stealthy remote-access backdoor.
+  where:
+    - { field: shell_nologin, op: truthy }
+  evidence: "authorized_keys for {user} ({shell}): {type} {fingerprint} {comment}"
+  mitre: [T1098.004]
+
+- id: suspicious_connection
+  title: Connection on a known reverse-shell / C2 port
+  severity: medium
+  dataset: connections
+  description: >
+    A socket bound to or connected on a port favoured by reverse shells, miners
+    or C2 frameworks (4444, 1337, 31337, …).
+  where:
+    - { field: port_suspicious, op: truthy }
+  evidence: "{proto} {local_ip}:{local_port} -> {remote_ip}:{remote_port} [{state}] pid={pid}"
+  mitre: [T1571]
+
+- id: shell_history_tampered
+  title: Shell history neutralized
+  severity: medium
+  dataset: shell_history
+  description: >
+    A history file redirected to /dev/null or truncated to zero bytes is a
+    deliberate anti-forensics move to erase command-line evidence.
+  where:
+    - { field: neutralized, op: truthy }
+  evidence: "{user}'s {file} neutralized (symlink_to={symlink_to}, size={size})"
+  mitre: [T1070.003]
+
+- id: hidden_temp_file
+  title: Hidden file in a world-writable temp directory
+  severity: medium
+  dataset: hidden_suspicious
+  description: >
+    Dotfiles in /tmp, /var/tmp or /dev/shm are a favourite hiding place for
+    droppers, miners and staged payloads.
+  where:
+    - { field: benign, op: falsy }
+  evidence: "Hidden entry {path} ({mode}, {size} bytes, mtime={mtime})"
+  mitre: [T1564.001]
+
+- id: off_hours_login
+  title: Successful SSH login at an unusual hour
+  severity: low
+  dataset: auth_events
+  description: >
+    An accepted SSH login between 22:00 and 06:00 (UTC of the log). Low signal on
+    its own, but corroborates other findings during incident scoping.
+  where:
+    - { field: event, op: in, value: [accepted_password, accepted_publickey] }
+    - { field: off_hours, op: truthy }
+  evidence: "Off-hours login: {user} from {source_ip} at {hour}:00 ({event})"
+  mitre: [T1078]

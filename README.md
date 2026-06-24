@@ -172,21 +172,30 @@ src/ammit/
 
 ## Detection rules
 
-Rules are declarative YAML weighed by the triage engine. The built-in set
+Rules are declarative YAML weighed by the triage engine
+([`src/ammit/rules/builtin/`](src/ammit/rules/builtin/)). Each selects an
+*enriched dataset* built from the collected artifacts, filters it, and emits a
+finding mapped to [MITRE ATT&CK](https://attack.mitre.org/). The built-in set
 focuses on high-signal Linux intrusion indicators:
 
 | Rule | Severity | ATT&CK |
 | --- | --- | --- |
-| SSH brute-force / password spraying | High | T1110 |
-| New key added to `authorized_keys` | High | T1098.004 |
-| Running process whose binary was deleted from disk | Critical | T1036 / T1014 |
-| Connection to a suspicious port/address | Medium | T1571 |
-| Recently created cron/systemd persistence | High | T1053 / T1543.002 |
-| System binary hash differs from its package (`dpkg --verify`) | Critical | T1554 |
-| Login outside business hours | Low | T1078 |
-| Shell history cleared or redirected to `/dev/null` | Medium | T1070.003 |
+| Process running a binary deleted from disk | Critical | T1070.004 / T1036.005 |
+| Multiple accounts share UID 0 | Critical | T1136.001 / T1078.003 |
+| SSH brute-force from a single source (≥ 8 failures) | High | T1110.001 |
+| `/etc/ld.so.preload` present (userland-rootkit vector) | High | T1574.006 |
+| SUID binary outside system directories | High | T1548.001 |
+| Cron job with a download-and-execute / reverse-shell command | High | T1053.003 |
+| systemd unit with a suspicious `ExecStart` | High | T1543.002 |
+| `authorized_keys` on a nologin/service account | High | T1098.004 |
+| Connection on a known reverse-shell / C2 port | Medium | T1571 |
+| Shell history redirected to `/dev/null` or truncated | Medium | T1070.003 |
+| Hidden file in a world-writable temp directory | Medium | T1564.001 |
+| Successful SSH login at an unusual hour | Low | T1078 |
 
-*(Status tracked in the roadmap below — rules ship with the `triage` engine.)*
+Bring your own rules with `ammit triage <case> --rules my-rules.yaml`. Use
+`--exit-code` to make the verdict the process exit status (0 clean, 1 suspicious,
+2 compromised) for pipelines.
 
 ---
 
@@ -209,13 +218,13 @@ full `collect → triage → COMPROMISED` path is exercised safely and reproduci
 ## Roadmap
 
 - [x] Project skeleton, CLI surface, packaging, CI
-- [ ] Core plumbing: integrity, case dir, manifest, chain of custody
-- [ ] `collect` — volatile, persistence, accounts, filesystem, logs
-- [ ] `triage` — rule engine + built-in rules
+- [x] Core plumbing: integrity, case dir, manifest, chain of custody
+- [x] `collect` — volatile, persistence, accounts, filesystem, logs
+- [x] `triage` — rule engine + built-in rules
+- [x] Synthetic compromised-system fixture + end-to-end tests
 - [ ] `verdict` / `report` — Markdown / JSON (HTML optional)
 - [ ] `timeline` — super-timeline (mactime body file / CSV / JSON)
 - [ ] `baseline` — known-good snapshot + diff
-- [ ] Synthetic compromised-system fixture + end-to-end tests
 
 ---
 

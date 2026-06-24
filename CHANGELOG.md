@@ -28,3 +28,21 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     changes and hidden temp files;
   - **logs** — auth logs, per-user shell histories (with tamper detection) and
     journald. Live mode enriches with `ss`/`ps`/`lsmod`/`last`/`journalctl`.
+- `triage`: a declarative YAML rule engine that weighs collected artifacts
+  against the feather of Maat and renders a verdict.
+  - Datasets layer that loads and *enriches* artifacts (suspicious ports on
+    connections, IOC indicators on cron/systemd commands, parsed `auth.log`
+    events with off-hours flags, SUID outside system dirs, nologin SSH keys).
+  - Rule engine with ANDed conditions, regex/path operators and
+    `group_by` + `having` aggregation (e.g. "≥ 8 failed logins from one IP").
+  - 12 built-in rules mapped to MITRE ATT&CK: deleted-binary process, duplicate
+    UID 0, SSH brute-force, `ld.so.preload`, off-path SUID, malicious
+    cron/systemd, nologin `authorized_keys`, C2-port connection, neutralized
+    shell history, hidden temp files, off-hours login.
+  - Verdict engine (CLEAN / SUSPICIOUS / COMPROMISED) by forensic weight, written
+    to `findings.json` and stamped into the manifest without disturbing the
+    sealed chain-of-custody hash. `--exit-code` maps the verdict to the process
+    exit status; `--rules` adds custom rule files.
+- Test suite: a synthetic, root-free "compromised system" fixture exercised
+  end-to-end (collect → triage → COMPROMISED), plus unit tests for the engine,
+  verdict thresholds and dataset enrichment.

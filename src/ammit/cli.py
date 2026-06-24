@@ -8,6 +8,7 @@ known-good heart for future comparison.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -16,6 +17,9 @@ import typer
 from . import __version__
 from .collect import build_context, print_summary, run_collection
 from .console import console, err_console
+from .models import Verdict
+from .render import findings_table, print_findings, verdict_panel
+from .triage import run_triage
 
 app = typer.Typer(
     name="ammit",
@@ -148,9 +152,48 @@ def triage(
         str,
         typer.Option("--format", "-f", help="Output format: table | json."),
     ] = "table",
+    exit_code: Annotated[
+        bool,
+        typer.Option(
+            "--exit-code",
+            "-e",
+            help="Exit 1 if SUSPICIOUS, 2 if COMPROMISED (otherwise 0).",
+        ),
+    ] = False,
 ) -> None:
     """Run the rule engine over collected artifacts and emit weighed findings."""
-    _todo("triage")
+    if not (case / "manifest.json").is_file():
+        err_console.print(f"[err]Not an Ammit case folder (no manifest.json):[/err] {case}")
+        raise typer.Exit(code=2)
+
+    baseline_data = None
+    if baseline is not None:
+        try:
+            baseline_data = json.loads(baseline.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            err_console.print(f"[err]Could not read baseline:[/err] {exc}")
+            raise typer.Exit(code=2) from exc
+
+    err_console.print(
+        f"[accent]⚖  Ammit[/accent] weighing [bold]{case.name}[/bold] against the feather…"
+    )
+    findings, verdict, summary = run_triage(case, extra_rules=rules, baseline=baseline_data)
+
+    if fmt == "json":
+        console.print((case / "findings.json").read_text(encoding="utf-8").rstrip())
+    else:
+        if findings:
+            console.print(findings_table(findings))
+            print_findings(console, findings)
+        else:
+            console.print("[muted]No findings — the heart bears no mark.[/muted]")
+        console.print()
+        console.print(verdict_panel(verdict, summary))
+
+    if exit_code:
+        raise typer.Exit(
+            code={Verdict.CLEAN: 0, Verdict.SUSPICIOUS: 1, Verdict.COMPROMISED: 2}[verdict]
+        )
 
 
 # --- Stage 4: pronounce judgement ---------------------------------------------
